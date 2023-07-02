@@ -12,13 +12,9 @@ const ValidateToken = async function _validatetoken(req, res, next){
                     succeeded: false,
                     data: null,
                     message: "Invalid token",
-                    error: {
-                        code: "auth/token",
-                        msg: "Invalid token",
-                    }
+                    errors: [err],
                 })
             } else {
-                console.log(decoded);
                 req.body.user = decoded;
                 next()
             }
@@ -26,11 +22,8 @@ const ValidateToken = async function _validatetoken(req, res, next){
     } else {
         req.body.user = null;
         res.status(400).send({
-            mesasge: "Not authenticated",
-            error: {
-                code: "auth/token",
-                msg: "Invalid Token"
-            }
+            mesasge: "Invalid Token",
+            errors: ["Invalid Token"],
         })
     }
 }

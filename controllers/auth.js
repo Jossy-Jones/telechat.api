@@ -20,10 +20,7 @@ const Auth = {
                 message: "Please fill the required fields",
                 succeeded: false,
                 data: null,
-                error: {
-                    code: "auth/invalid_parameters",
-                    msg: error_messages
-                }
+                errors: error_messages
             })
         } else {
             // Create payload
@@ -34,9 +31,10 @@ const Auth = {
                 password: encrypt_password,
             }
             try {
-                await CreateUser(payload);
+                const user = await CreateUser(payload);
                 // Create login token
                 const accessToken = jwt.sign({
+                    id: user._id,
                     username,
                 }, process.env.Token_Secret)
 
@@ -44,7 +42,7 @@ const Auth = {
                     message: "User created successfully",
                     succeeded: true,
                     data: {accessToken},
-                    error: null,
+                    errors: null,
                 })
                 
             } catch (error) {
@@ -52,10 +50,7 @@ const Auth = {
                     message: "Could not create this user",
                     succeeded: false,
                     data: null,
-                    error: {
-                        code: "db/error",
-                        msg: error,
-                    }
+                    errors: [error]
                 })
             }
         }
@@ -76,10 +71,7 @@ const Auth = {
                 message: "Please fill the required fields",
                 succeeded: false,
                 data: null,
-                error: {
-                    code: "auth/invalid_parameters",
-                    msg: error_messages
-                }
+                errors: error_messages
             })
         } else {
             try {
@@ -87,6 +79,7 @@ const Auth = {
                 const access_granted = await compareCrypt(password, user.password);
                 if(access_granted){
                     const accessToken = jwt.sign({
+                        id: user._id,
                         username,
                     }, process.env.Token_Secret)
                     res.status(200).send({
@@ -95,14 +88,14 @@ const Auth = {
                             accessToken,
                         }, //send token
                         succeeded: true,
-                        error: null,
+                        errors: null,
                     })
                 } else {
                     res.status(400).send({
                         message: "Incorrect username or password",
                         succeeded: false,
                         data: null,
-                        error: null,
+                        errors: null,
                     })
                 }
             } catch (error) {
@@ -110,10 +103,7 @@ const Auth = {
                     message: "There is no user with this username",
                     succeeded: false,
                     data: null,
-                    error: {
-                        code: "db/error",
-                        msg: error,
-                    }
+                    errors: [error]
                 })
             }
         }

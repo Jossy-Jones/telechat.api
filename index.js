@@ -10,6 +10,7 @@ import ChatEvents from "./events/chat.js";
 import UserEvents from "./events/user.js";
 import Routes from "./routes/index.js";
 import { ValidateSocket } from "./middlewares/authenticate.js";
+import { WatchChat } from "./models/chat.js";
 
 const app = express();
 app.use(express.json());
@@ -44,7 +45,6 @@ const io = new Server(server, {
 
 io.use(ValidateSocket).on("connection", (socket) => {
     // Register Handlers
-    console.log(socket.valid_user);
     ChatEvents(io, socket);
     UserEvents(io, socket);
 })

@@ -3,11 +3,6 @@ import { Schema } from "mongoose";
 
 //@Schema
 const MessageSchema = {
-    messageId: {
-        type: String,
-        required: true,
-        unique: true
-    },
     content: {
         type: String,
     },
@@ -15,10 +10,10 @@ const MessageSchema = {
         type: String,
         required: true,
     },
-    sender: [{
-        type: Schema.Types.ObjectId,
-        ref: "users"
-    }],
+    sender: {
+        type: String,
+        required: true
+    },
     chatId: {
         type: String,
         required: true
@@ -36,7 +31,12 @@ const CreateMessage = function(payload={}){
             const new_message = new MessageModel(message_data);
             try {
                 const created = await new_message.save();
-                resolve(created);
+                resolve(created.populate(
+                    {
+                        path: "sender",
+                        select: ["username", "fullname"]
+                    }
+                ));
             } catch (error) {
                 reject(error.message)
             }

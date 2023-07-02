@@ -15,14 +15,14 @@ const GetAllUsers = async function (req, res){
                 succeeded: true,
                 message: "Fetch completed",
                 data: users,
-                error: null
+                errors: null
             })
         } else {
             res.status(204).send({
                 succeeded: true,
                 message: "Fetch completed",
                 data: [],
-                error: null,
+                errors: null,
             })
         }
     } catch (error) {
@@ -30,10 +30,7 @@ const GetAllUsers = async function (req, res){
             message: "Could not fetch users",
             succeeded: false,
             data: null,
-            error: {
-                code: "db/error",
-                msg: error
-            }
+            errors: [error]
         })
     }
 }

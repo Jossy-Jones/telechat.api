@@ -1,66 +1,97 @@
 import { ReadUser } from "../models/user.js";
-import { CreateChat } from "../models/chat.js";
+import { AddMessage, CreateChat, ReadChat } from "../models/chat.js";
+import { CreateMessage } from "../models/message.js";
 
 const ChatEvents = (io, socket) => {
+    const current_user = socket.valid_user;
+
     const emit_user = function (event = "chat:event", payload) {
-        const { username } = socket.valid_user;
-        io.sockets.in(username).emit(event, payload)
+        io.sockets.in(current_user.username).emit(event, payload)
     }
 
-
+    // Join Chat
     const joinChat = async function (payload) {
         const { roomId } = payload;
         const { username } = socket.valid_user
         try {
-            const chat_data = {
-                chatId: roomId,
-                members: []
-            }
             const user = await ReadUser(username);
-            console.log(user)
-            chat_data.members.push(user._id)
-            await CreateChat(chat_data)
-
-            // check if roomId (userId) is valid
-            socket.join(roomId);
-            const _rooms = [...(socket.rooms)];
-            if (_rooms.includes(roomId)) {
-                emit_user("chat:created", { data: roomId })
+            const chat_exists = await ReadChat(roomId);
+            if(chat_exists){
+                // check if roomId (userId) is valid
+                socket.join(roomId);
+                const _rooms = [...(socket.rooms)];
+                if (_rooms.includes(roomId)) {
+                    emit_user("chat:created", { data: roomId })
+                } else {
+                    emit_user("chat:error", { error: "Could not join chat" })
+                }
             } else {
-                emit_user("chat:error", { error: "Could not create chat" })
+                emit_user("chat:error", { error: "Chat does not exist" })
             }
+
         } catch (error) {
             emit_user("chat:error", { error: error })
         }
     }
 
+    // Exit a chat
     const leaveChat = function (payload) { }
 
-    const outboundMessage = function (payload) {
-        console.log(payload)
-        const { userId, roomId, roomType, message } = payload;
-        const valid_rooms = [...(socket.rooms)];
-        if (!valid_rooms.includes(roomId)) return false;
+    // Send Message
+    const outboundMessage = async function (payload) {
+        const { username } = socket.valid_user
+        let { roomId, roomType, message } = payload;
+        roomId = typeof roomId === "string" && roomId.trim().length > 0 ? roomId.trim() : false;
+        message = typeof message === "string" && message.trim().length > 0 ? message.trim() : false;
 
-        const room_members = typeof (roomId) === "string" && roomType === "personal" ? roomId.split("_") : [];
+        const errors = [];
+        if(!roomId) errors.push("'roomId' is required");
+        if(!message) errors.push("'message' can not be empty");
 
-        if (room_members && room_members.length > 0) {
-            if (!room_members.includes(userId)) return false;
-            // Create Message
-            io.sockets.in(roomId).emit("chat:inbound", { userId, message })
+        if(errors.length > 0){
+            emit_user("chat:error", { error: errors });
+        } else {
+            try {
+                const chat = await ReadChat(roomId);
+                if(chat){
+                    // Create Message
+                    const message_payload = {
+                        content: message,
+                        chatId: roomId,
+                        sender: username,
+                    }
+                    const new_message = await CreateMessage(message_payload);
+                    const messageId = (new_message._id).toString;
+                    await AddMessage(roomId, messageId);
+
+                    // Send message to client
+                    io.sockets.in(roomId).emit("chat:inbound", new_message);
+
+                    // Emit to room members
+                    const _members = chat.members;
+                    const room_members = _members.map((user)=>{
+                        return user.username;
+                    });
+                    const recipients = room_members.filter(user=>user!==current_user.username)
+                    recipients.map(receiver => {
+                        io.sockets.in(receiver).emit("chat:inbound", new_message);
+                        // Send to socket id
+                        // io.sockets.socket(socketId).emit("chat:inbound", new_message)
+                    });
+                } else {
+                    emit_user("chat:error", {error: "Chat Room does not exist, or may have been deleted"});
+                }
+                
+            } catch (error) {
+                emit_user("chat:error", { error: error })
+            }
         }
     }
-
-    const inboundMessage = function (payload) {
-        console.log(payload)
-    }
-
 
     // Register handlers
     socket.on("chat:join", joinChat);
     socket.on("chat:leave", leaveChat);
     socket.on("chat:outbound", outboundMessage)
-    // socket.on("chat:inbound", inboundMessage);
 }
 
 export default ChatEvents;
